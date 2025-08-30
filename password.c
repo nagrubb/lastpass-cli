@@ -36,6 +36,7 @@
 #include "password.h"
 #include "util.h"
 #include "terminal.h"
+#include "touchid.h"
 #include <sys/types.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -47,7 +48,7 @@
 #include <errno.h>
 #include <termios.h>
 
-static char *password_prompt_askpass(const char *askpass, const char *prompt, const char *error, const char *descfmt, va_list params)
+static char *password_prompt_askpass(const char *askpass, const char *prompt, const char *error, const char *description)
 {
 	int status;
 	int write_fds[2], read_fds[2];
@@ -56,8 +57,6 @@ static char *password_prompt_askpass(const char *askpass, const char *prompt, co
 	char *password = NULL, *lastlf;
 	size_t len;
 	UNUSED(error);
-	UNUSED(descfmt);
-	UNUSED(params);
 
 	if (pipe(write_fds) < 0 || pipe(read_fds) < 0)
 		die_errno("pipe");
@@ -102,14 +101,14 @@ static char *password_prompt_askpass(const char *askpass, const char *prompt, co
 	return password;
 }
 
-static char *password_prompt_fallback(const char *prompt, const char *error, const char *descfmt, va_list params)
+static char *password_prompt_fallback(const char *prompt, const char *error, const char *description)
 {
 	struct termios old_termios, mask_echo;
 	char *password = NULL, *lastlf;
 	size_t len = 0;
 
 	terminal_fprintf(stderr, TERMINAL_FG_YELLOW TERMINAL_BOLD);
-	vfprintf(stderr, descfmt, params);
+	fprintf(stderr, description);
 	terminal_fprintf(stderr, TERMINAL_RESET "\n\n");
 
 	if (error)
@@ -214,7 +213,7 @@ char *pinentry_unescape(const char *str)
 	return unescaped;
 }
 
-char *password_prompt(const char *prompt, const char *error, const char *descfmt, ...)
+char *password_prompt(const char *prompt, const char *error, const char *description)
 {
 	int status;
 	int write_fds[2], read_fds[2];
@@ -223,7 +222,6 @@ char *password_prompt(const char *prompt, const char *error, const char *descfmt
 	_cleanup_fclose_ FILE *input = NULL;
 	_cleanup_fclose_ FILE *output = NULL;
 	_cleanup_free_ char *line = NULL;
-	_cleanup_free_ char *desc = NULL;
 	_cleanup_free_ char *prompt_colon = NULL;
 	_cleanup_free_ char *password = NULL;
 	char *password_fallback;
@@ -231,22 +229,17 @@ char *password_prompt(const char *prompt, const char *error, const char *descfmt
 	char *pinentry_fallback = "pinentry";
 	char *pinentry;
 	char *ret;
-	va_list params;
 	int devnull;
 
 	askpass = getenv("LPASS_ASKPASS");
 	if (askpass) {
-		va_start(params, descfmt);
-		askpass = password_prompt_askpass(askpass, prompt, error, descfmt, params);
-		va_end(params);
+		askpass = password_prompt_askpass(askpass, prompt, error, description);
 		return askpass;
 	}
 
 	password_fallback = getenv("LPASS_DISABLE_PINENTRY");
 	if (password_fallback && !strcmp(password_fallback, "1")) {
-		va_start(params, descfmt);
-		password_fallback = password_prompt_fallback(prompt, error, descfmt, params);
-		va_end(params);
+		password_fallback = password_prompt_fallback(prompt, error, description);
 		return password_fallback;
 	}
 
@@ -341,11 +334,7 @@ char *password_prompt(const char *prompt, const char *error, const char *descfmt
 		check();
 	}
 
-	va_start(params, descfmt);
-	xvasprintf(&desc, descfmt, params);
-	va_end(params);
-
-	send("SETDESC", desc);
+	send("SETDESC", description);
 	check();
 
 	option("ttytype", getenv("TERM"));
@@ -404,10 +393,37 @@ dead_pinentry:
 	if (WEXITSTATUS(status) == 0)
 		return NULL;
 	else if (WEXITSTATUS(status) == 76) {
-		va_start(params, descfmt);
-		password_fallback = password_prompt_fallback(prompt, error, descfmt, params);
-		va_end(params);
+		password_fallback = password_prompt_fallback(prompt, error, description);
 		return password_fallback;
 	} else
 		die("There was an unspecified problem with pinentry.");
+}
+
+char *password_prompt_with_touchid(const char *prompt, const char *error, const char *service_name, const char *account_name, const char *description)
+{
+#ifdef __APPLE__
+	char *password = NULL;
+
+	// Try to get password from TouchID/Keychain first
+	if (touchid_password_exists(service_name, account_name)) {
+		if (touchid_retrieve_password(service_name, account_name, &password)) {
+			return password;
+		}
+	}
+	
+	// Fall back to regular password prompt
+	password = password_prompt(prompt, error, description);
+
+	// If we got a password and TouchID is available, store it in Keychain
+	if (password && touchid_is_available()) {
+		touchid_store_password(service_name, account_name, password);
+	}
+	
+	return password;
+#else
+	// On non-Apple platforms, just use regular password prompt
+	return password_prompt(prompt, error, description);	
+#endif
+
+
 }

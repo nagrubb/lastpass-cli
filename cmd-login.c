@@ -44,6 +44,7 @@
 #include "config.h"
 #include "agent.h"
 #include "terminal.h"
+#include "touchid.h"
 #include <getopt.h>
 
 int cmd_login(int argc, char **argv)
@@ -53,6 +54,9 @@ int cmd_login(int argc, char **argv)
 		{"plaintext-key", no_argument, NULL, 'P'},
 		{"force", no_argument, NULL, 'f'},
 		{"color", required_argument, NULL, 'C'},
+#ifdef __TOUCHID_AVAILABLE__
+		{"no-touchid", no_argument, NULL, 'T'},
+#endif
 		{0, 0, 0, 0}
 	};
 	int option;
@@ -60,6 +64,7 @@ int cmd_login(int argc, char **argv)
 	bool trust = false;
 	bool plaintext_key = false;
 	bool force = false;
+	bool use_touchid = true;
 	char *username;
 	_cleanup_free_ char *error = NULL;
 	_cleanup_free_ char *password = NULL;
@@ -67,6 +72,7 @@ int cmd_login(int argc, char **argv)
 	struct session *session;
 	unsigned char key[KDF_HASH_LEN];
 	char hex[KDF_HEX_LEN];
+	char password_prompt_description[NAME_MAX];
 
 	while ((option = getopt_long(argc, argv, "f", long_options, &option_index)) != -1) {
 	switch (option) {
@@ -83,6 +89,9 @@ int cmd_login(int argc, char **argv)
 			terminal_set_color_mode(
 				parse_color_mode_string(optarg));
 			break;
+		case 'T':
+			use_touchid = false;
+			break;
 		case '?':
 		default:
 			die_usage(cmd_login_usage);
@@ -95,13 +104,31 @@ int cmd_login(int argc, char **argv)
 		die("Login aborted. Try again without --plaintext-key.");
 
 	username = argv[optind];
+	
+	// Initialize TouchID if available and not disabled by the user
+	if (use_touchid) {
+		touchid_init();
+	}
+	
 	iterations = lastpass_iterations(username);
-	if (!iterations)
+	if (!iterations) {
 		die("Unable to fetch iteration count. Check your internet connection and be sure your username is valid.");
+	}
+
+	if (snprintf(password_prompt_description, sizeof(password_prompt_description), "Please enter the LastPass master password for <%s>.", username) < 0) {
+		die("Failed to format password prompt.");
+	}
 
 	do {
 		free(password);
-		password = password_prompt("Master Password", error, "Please enter the LastPass master password for <%s>.", username);
+		
+		// Use TouchID if available and not disabled
+		if (use_touchid && touchid_is_available()) {
+			password = password_prompt_with_touchid("Master Password", error, "LastPass CLI", username, password_prompt_description);
+		} else {
+			password = password_prompt("Master Password", error, password_prompt_description);
+		}
+		
 		if (!password)
 			die("Failed to enter correct password.");
 
@@ -119,6 +146,7 @@ int cmd_login(int argc, char **argv)
 
 	agent_save(username, iterations, key);
 
+	session->require_touchid = use_touchid;
 	session_save(session, key);
 	session_free(session);
 	session = NULL;

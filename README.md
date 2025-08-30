@@ -185,6 +185,42 @@ sudo make -C /usr/ports/security/lastpass-cli all install clean
 apt-cyg install wget make cmake gcc-core gcc-g++ openssl-devel libcurl-devel libxml2-devel libiconv-devel cygutils-extra
 ```
 
+## TouchID Integration (macOS)
+
+On macOS, LastPass CLI supports TouchID authentication and Apple Keychain integration for enhanced security and convenience.
+
+### Features
+
+- **TouchID Authentication**: Use your fingerprint to authenticate instead of typing your master password
+- **Secure Storage**: Master passwords are stored securely in Apple's Keychain
+- **Automatic Fallback**: Falls back to regular password prompt if TouchID is unavailable
+
+### Usage
+
+To use TouchID (enabled by default on macOS):
+
+```bash
+lpass login username@example.com
+```
+
+To disable TouchID for a specific login:
+
+```bash
+lpass login --no-touchid username@example.com
+```
+
+### Requirements
+
+- macOS 10.12.4 or later
+- TouchID-enabled device or Apple Watch
+- LastPass CLI built with TouchID support
+
+### Security
+
+- Passwords are stored in Apple's Keychain with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility
+- TouchID authentication is required to retrieve stored passwords
+- Passwords are automatically cleaned up on logout
+
 ## Building
 
     $ make

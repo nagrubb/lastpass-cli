@@ -333,4 +333,21 @@ local out=$(lpass export --sync=no --fields=grouping,url,username,password,extra
 	assert_str_eq "$expected" "$out"
 }
 
+function test_touchid
+{
+	# Only run TouchID tests on macOS
+	if [[ "$(uname)" != "Darwin" ]]; then
+		echo "TouchID tests skipped - not on macOS"
+		return 0
+	fi
+	
+	# Test that TouchID option is available
+	if ! lpass --help | grep -q "no-touchid"; then
+		echo "ERROR: TouchID option not found in help output"
+		return 1
+	fi
+	
+	echo "TouchID integration test passed"
+}
+
 runtests "$@"

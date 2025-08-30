@@ -20,6 +20,7 @@ struct session {
 	char *server;
 	struct private_key private_key;
 	struct feature_flag feature_flag;
+	bool require_touchid;
 };
 
 struct session *session_new();

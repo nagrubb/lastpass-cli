@@ -1,9 +1,4 @@
-if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.1)
-  set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake > 2.8.4 is required
-  cmake_minimum_required(VERSION 2.8)
-else()
-  cmake_minimum_required(VERSION 3.1)
-endif()
+cmake_minimum_required(VERSION 3.5)
 
 project(lpass)
 include(GNUInstallDirs)
@@ -98,6 +93,10 @@ set(PROJECT_NAME lpass)
 
 file(GLOB PROJECT_HEADERS *.h version.h)
 file(GLOB PROJECT_SOURCES *.c)
+if(APPLE)
+  file(GLOB PROJECT_OBJC_SOURCES *.m)
+  list(APPEND PROJECT_SOURCES ${PROJECT_OBJC_SOURCES})
+endif()
 
 set(PROJECT_DEFINITIONS "_GNU_SOURCE")
 
@@ -118,6 +117,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 target_link_libraries(${PROJECT_NAME} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES})
+if(APPLE)
+  target_link_libraries(${PROJECT_NAME} "-framework Security" "-framework LocalAuthentication" "-framework Foundation")
+endif()
 if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
   target_link_libraries(${PROJECT_NAME} "-lkvm")
 endif (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
@@ -144,6 +146,9 @@ endif()
 
 # Test lpass executable with mock server, link against test versions first
 file(GLOB LPTEST_SOURCES test/*.c *.c)
+if(APPLE)
+  list(APPEND LPTEST_SOURCES ${PROJECT_OBJC_SOURCES})
+endif()
 add_executable(lpass-test EXCLUDE_FROM_ALL ${PROJECT_HEADERS} ${LPTEST_SOURCES})
 set_target_properties(lpass-test PROPERTIES
   C_STANDARD 99
@@ -151,6 +156,9 @@ set_target_properties(lpass-test PROPERTIES
   COMPILE_DEFINITIONS ${PROJECT_DEFINITIONS}
 )
 target_link_libraries(lpass-test ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES})
+if(APPLE)
+  target_link_libraries(lpass-test "-framework Security" "-framework LocalAuthentication" "-framework Foundation")
+endif()
 if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
   target_link_libraries(lpass-test "-lkvm")
 endif (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
@@ -176,6 +184,7 @@ add_test(test_show_reprompt ${CMAKE_SOURCE_DIR}/test/tests test_show_reprompt)
 add_test(test_ls ${CMAKE_SOURCE_DIR}/test/tests test_ls)
 add_test(test_export ${CMAKE_SOURCE_DIR}/test/tests test_export)
 add_test(test_export_extended ${CMAKE_SOURCE_DIR}/test/tests test_export_extended)
+add_test(test_touchid ${CMAKE_SOURCE_DIR}/test/tests test_touchid)
 
 add_custom_target(doc-man DEPENDS lpass.1)
 add_custom_target(doc-html DEPENDS lpass.1.html)
