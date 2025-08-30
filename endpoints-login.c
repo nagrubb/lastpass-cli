@@ -286,8 +286,15 @@ static bool otp_login(const char *login_server, const unsigned char key[KDF_HASH
 		return error_message(message, session, *reply);
 
 	for (;;) {
+		char password_prompt_description[NAME_MAX];
+
 		free(multifactor);
-		multifactor = password_prompt("Code", multifactor_error, "Please enter your %s for <%s>.", otp_name ? otp_name : replied_multifactor->name, username);
+
+		if (snprintf(password_prompt_description, sizeof(password_prompt_description), "Please enter your %s for <%s>.", otp_name ? otp_name : replied_multifactor->name, username) < 0) {
+			return error_other(message, session, "Failed to format password prompt.");
+		}
+
+		multifactor = password_prompt("Code", multifactor_error, password_prompt_description);
 		if (!multifactor)
 			return error_other(message, session, "Aborted multifactor authentication.");
 		append_post(args, replied_multifactor->post_var, multifactor);

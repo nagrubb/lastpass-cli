@@ -74,6 +74,7 @@ void session_save(struct session *session, unsigned const char key[KDF_HASH_LEN]
 	config_write_encrypted_string("session_token", session->token, key);
 	config_write_encrypted_buffer("session_privatekey", (char *)session->private_key.key, session->private_key.len, key);
 	feature_flag_save(&session->feature_flag, key);
+	config_write_encrypted_string("session_require_touchid", session->require_touchid ? "1" : "0", key);
 
 	/*
 	 * existing sessions may not have a server yet; they will fall back
@@ -92,6 +93,11 @@ struct session *session_load(unsigned const char key[KDF_HASH_LEN])
 	session->private_key.len = config_read_encrypted_buffer("session_privatekey", &session->private_key.key, key);
 	mlock(session->private_key.key, session->private_key.len);
 	feature_flag_load(&session->feature_flag, key);
+
+    char *require_touchid = config_read_encrypted_string("session_require_touchid", key);
+    if (require_touchid != NULL) {
+        session->require_touchid = !strcmp(require_touchid, "1");
+    }
 
 	if (session_is_valid(session))
 		return session;

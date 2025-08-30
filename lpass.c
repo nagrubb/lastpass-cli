@@ -42,6 +42,7 @@
 #include "terminal.h"
 #include "version.h"
 #include "log.h"
+#include "touchid.h"
 #include <sys/stat.h>
 #include <getopt.h>
 #include <unistd.h>
@@ -205,8 +206,13 @@ int main(int argc, char *argv[])
 
 	load_saved_environment();
 
-	if (argc >= 2 && argv[1][0] != '-')
-		return process_command(argc - 1, argv + 1);
+	if (argc >= 2 && argv[1][0] != '-') {
+		int result = process_command(argc - 1, argv + 1);
+		touchid_cleanup();
+		return result;
+	}
 
-	return global_options(argc, argv);
+	int result = global_options(argc, argv);
+	touchid_cleanup();
+	return result;
 }

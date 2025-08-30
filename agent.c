@@ -91,8 +91,14 @@ bool agent_load_key(unsigned char key[KDF_HASH_LEN])
 		return false;
 
 	for (;;) {
+		char password_prompt_description[NAME_MAX];
+
+		if (snprintf(password_prompt_description, sizeof(password_prompt_description), "Please enter the LastPass master password for <%s>.", username) < 0) {
+			return false;
+		}
+
 		free(password);
-		password = password_prompt("Master Password", password ? "Incorrect master password; please try again." : NULL, "Please enter the LastPass master password for <%s>.", username);
+		password = password_prompt("Master Password", password ? "Incorrect master password; please try again." : NULL, password_prompt_description);
 		if (!password)
 			return false;
 		kdf_decryption_key(username, password, iterations, key);

@@ -40,6 +40,7 @@
 #include "agent.h"
 #include "upload-queue.h"
 #include "endpoints.h"
+#include "touchid.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -82,6 +83,11 @@ int cmd_logout(int argc, char **argv)
 	if (agent_ask(key)) {
 		init_all(0, key, &session, NULL);
 		lastpass_logout(session);
+		
+		// Clean up TouchID/Keychain stored passwords for this user
+		if (touchid_is_available() && session && session->uid) {
+			touchid_delete_password("LastPass CLI", session->uid);
+		}
 	}
 
 	session_kill();

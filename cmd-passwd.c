@@ -170,6 +170,7 @@ int cmd_passwd(int argc, char **argv)
 	int iterations;
 	bool match;
 	struct pwchange_info info;
+	char password_prompt_description[NAME_MAX];
 
 	/* load existing session, if present */
 	init_all(BLOB_SYNC_YES, key, &session, &blob);
@@ -180,9 +181,11 @@ int cmd_passwd(int argc, char **argv)
 		die("Unable to fetch iteration count. Check your internet connection and be sure your username is valid.");
 
 	/* reprompt for old mpw */
-	password = password_prompt("Current Master Password", NULL,
-		"Please enter the current LastPass master password for <%s>.",
-		username);
+	if (snprintf(password_prompt_description, sizeof(password_prompt_description), "Please enter the current LastPass master password for <%s>.", username) < 0) {
+		die("Failed to format password prompt.");
+	}
+
+	password = password_prompt("Current Master Password", NULL, password_prompt_description);
 
 	if (!password)
 		die("Failed to enter password.");
@@ -191,13 +194,17 @@ int cmd_passwd(int argc, char **argv)
 	secure_clear_str(password);
 
 	/* prompt for new pw */
-	new_password = password_prompt("New Master Password", NULL,
-		"Please enter the new LastPass master password for <%s>.",
-		username);
+	if (snprintf(password_prompt_description, sizeof(password_prompt_description), "Please enter the new LastPass master password for <%s>.", username) < 0) {
+		die("Failed to format password prompt.");
+	}
 
-	pw2 = password_prompt("Confirm New Master Password", NULL,
-		"Please retype the new LastPass master password for <%s>.",
-		username);
+	new_password = password_prompt("New Master Password", NULL, password_prompt_description);
+
+	if (snprintf(password_prompt_description, sizeof(password_prompt_description), "Please retype the new LastPass master password for <%s>.", username) < 0) {
+		die("Failed to format password prompt.");
+	}
+
+	pw2 = password_prompt("Confirm New Master Password", NULL, password_prompt_description);
 
 	if (!new_password || !pw2)
 		die("Failed to enter new password.");

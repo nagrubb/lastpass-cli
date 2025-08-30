@@ -37,6 +37,7 @@
 #include "agent.h"
 #include "blob.h"
 #include "session.h"
+#include "touchid.h"
 #include "util.h"
 #include "process.h"
 #include <strings.h>
@@ -97,6 +98,14 @@ void init_all(enum blobsync sync, unsigned char key[KDF_HASH_LEN], struct sessio
 	*session = session_load(key);
 	if (!*session)
 		die("Could not find session. Perhaps you need to login with `%s login`.", ARGV[0]);
+
+	if ((*session)->require_touchid) {
+		touchid_init();
+		
+		if (!touchid_prompt_for_authentication(NULL)) {
+			die("TouchID authentication failed. Please try again.");
+		}	
+	}
 
 	if (blob) {
 		*blob = blob_load(sync, *session, key);
